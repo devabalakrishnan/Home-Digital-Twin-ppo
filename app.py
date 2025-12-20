@@ -85,10 +85,11 @@ else:
     with col2:
         st.subheader("Predictive Analytics (XGBoost)")
         # Show appliance breakdown
-        appliances = ['Fridge', 'Heater', 'Fans', 'Lights', 'TV', 'Microwave', 'Washing Machine']
+        appliances = ['Fridge', 'Heater', 'Fans', 'Lights', 'TV', 'Microwave', 'Washing_Machine']
         fig = px.pie(values=current_data[appliances], names=appliances, title="Appliance Energy Stake")
         st.plotly_chart(fig, use_container_width=True)
 
     st.divider()
     st.subheader("24-Hour Optimization Trend")
     st.line_chart(df.set_index('datetime')[['electricity_price', 'occupancy']])
+
