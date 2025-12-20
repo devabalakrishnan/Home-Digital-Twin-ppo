@@ -1,4 +1,27 @@
+ # Python bytecode
 __pycache__/
 *.pyc
-.ipynb_checkpoints/
+*.pyo
+*.pyd
+
+# Streamlit local config
 .streamlit/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# Virtual Environments
+venv/
+env/
+.env
+
+# Large Data Files (Keep your training data on Git, but ignore local logs)
+*.log
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Optional: If you don't want to upload your generated forecast every time
+# data/next_day_prediction.csv
