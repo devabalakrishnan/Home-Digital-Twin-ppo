@@ -1,4 +1,4 @@
-datetime,occupancy,electricity_price,Fridge,Heater,Fans,Lights,TV,Microwave,Washing Machine
+datetime,occupancy,electricity_price,Fridge,Heater,Fans,Lights,TV,Microwave,Washing_Machine
 2015-08-14 10:00:00+00:00,1,0.5,0.1331245,0.004110997,0.008934946,0.000206722,0,0,0
 2015-08-14 11:00:00+00:00,1,0.5,0.11801882,0,0.013758859,0.001403994,0,1.071557306,0
 2015-08-14 12:00:00+00:00,2,0.5,0.12673707,0,0,0.001645454,0,1.071557306,0.4874763
@@ -23,3 +23,4 @@ datetime,occupancy,electricity_price,Fridge,Heater,Fans,Lights,TV,Microwave,Wash
 2015-08-15 07:00:00+00:00,1,0.5,0.12748225,1.790832,0.003982801,0,0,1.071557306,0
 2015-08-15 08:00:00+00:00,3,0.3,0.12631321,0,0,0.0006567,0,0,0
 2015-08-15 09:00:00+00:00,3,0.3,0.12135518,0,0,0,0,0,0
+
