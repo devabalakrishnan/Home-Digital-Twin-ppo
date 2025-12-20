@@ -1,4 +1,4 @@
- import streamlit as st
+import streamlit as st
 import pandas as pd
 import numpy as np
 import base64
@@ -136,3 +136,4 @@ else:
     st.subheader("📈 24-Hour Predictive Trend (XGBoost Output)")
     trend_fig = px.line(df, x=df.index, y=available_apps, title="Next-Day Load Forecast per Appliance")
     st.plotly_chart(trend_fig, use_container_width=True)
+
