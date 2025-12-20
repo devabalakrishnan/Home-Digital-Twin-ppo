@@ -1,4 +1,4 @@
-datetime,day_of_week,electricity_price,occupancy,Fridge,Heater,Fans,TV,Lights,Microwave,Washing Machine,Critical Load,Total Load
+datetime,day_of_week,electricity_price,occupancy,Fridge,Heater,Fans,TV,Lights,Microwave,Washing_Machine,Critical Load,Total Load
 2013-10-02 05:00:00+00:00,2,3.0,1,0.159934283,1.930867849,0.0,0.0,0.092953771,0.0,0.0,2.183755903,2.183755903
 2013-10-02 06:00:00+00:00,2,0.5,3,0.180460597,2.789606408,0.0,0.0,0.095348695,0.0,0.406105123,3.065415699,3.471520822
 2013-10-02 07:00:00+00:00,2,0.5,5,0.160851201,1.768291154,0.0,0.0,0.0,0.0,0.0,1.929142354,1.929142354
