@@ -55,7 +55,7 @@ future_df['hour_cos'] = np.cos(2 * np.pi * future_df['hour'] / 24)
 future_df['occupancy'] = [np.random.randint(3, 6) if (7<=h<=9 or 18<=h<=22) else np.random.randint(1, 3) for h in future_df['hour']]
 
 # Electricity Price: Peak hours are expensive (Correcting the logic for PPO)
-future_df['electricity_price'] = [0.65 if (7<=h<=10 or 18<=h<=22) else 0.25 for h in future_df['hour']]
+future_df['electricity_price'] = [0.6 if (7<=h<=10 or 18<=h<=22) else 0.2 for h in future_df['hour']]
 
 # Apply models to predict future load
 for app in appliances:
@@ -70,3 +70,4 @@ future_df.to_csv(output_path, index=False)
 
 print(f"Success! Prediction file saved at: {output_path}")
 print("You can now run 'streamlit run app.py'")
+
