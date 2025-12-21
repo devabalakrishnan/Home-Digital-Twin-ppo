@@ -88,16 +88,17 @@ else:
     total_raw_load = float(row[available_apps].sum())
 
     # Simulated PPO Agent Decision
-    if price > 0.6:
-        status = "CRITICAL"
-        ppo_msg = "PPO ACTION: LOAD SHEDDING"
-        # Reduce heavy loads (Heater/Washing Machine) by 70%
-        reduction = (float(row.get('Heater', 0)) * 0.7) + (float(row.get('Washing Machine', 0)) * 0.7)
-        optimized_load = total_raw_load - reduction
-    elif price > 0.4:
-        status = "HIGH"
-        ppo_msg = "PPO STATUS: MONITORING"
-        optimized_load = total_raw_load
+   # --- BINARY PPO LOGIC ---
+if price >= 0.6: # Peak Load Logic
+    status = "CRITICAL (PEAK)"
+    ppo_msg = "PPO ACTION: PEAK LOAD SHEDDING"
+    # Reduce heavy loads by 70%
+    reduction = (float(row.get('Heater', 0)) * 0.7) + (float(row.get('Washing Machine', 0)) * 0.7)
+    optimized_load = total_raw_load - reduction
+else: # Off-Peak Load Logic
+    status = "OPTIMIZED (OFF-PEAK)"
+    ppo_msg = "PPO STATUS: NORMAL OPERATION"
+    optimized_load = total_raw_load
     else:
         status = "OPTIMIZED"
         ppo_msg = "PPO STATUS: NORMAL"
@@ -134,3 +135,4 @@ else:
     st.subheader("📈 24-Hour Predictive Forecast")
     trend_fig = px.line(df, x=df.index, y=available_apps)
     st.plotly_chart(trend_fig, use_container_width=True)
+
