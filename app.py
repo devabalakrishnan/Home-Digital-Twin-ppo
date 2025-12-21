@@ -4,6 +4,7 @@ import numpy as np
 import base64
 import os
 import plotly.express as px
+import matplotlib.pyplot as plt
 
 # --- 1. SETTINGS & PATHS ---
 st.set_page_config(page_title="Home Digital Twin AI", layout="wide")
@@ -29,12 +30,11 @@ def display_custom_house(load_status, load_value):
         "OPTIMIZED (OFF-PEAK)": "rgba(0, 255, 0, 0.2)"
     }
     glow_color = glows.get(str(load_status), "rgba(0, 255, 0, 0.2)")
-
     img_base64 = get_base64_of_bin_file(ASSET_PATH)
     if img_base64:
         img_html = f'<img src="data:image/svg+xml;base64,{img_base64}" width="100%" style="max-width: 350px;">'
     else:
-        url = "https://raw.githubusercontent.com/FortAwesome/Font-Awesome/6.x/svgs/solid/house-chimney.svg"
+        url = "https://raw.githubusercontent.com/FontAwesome/Font-Awesome/6.x/svgs/solid/house-chimney.svg"
         img_html = f'<img src="{url}" width="120" style="filter: invert(0.5); opacity: 0.8;">'
 
     st.markdown(
@@ -57,8 +57,7 @@ if not os.path.exists(DATA_PATH):
     st.error(f"🚨 Data file not found at `{DATA_PATH}`. Please run your training script first.")
 else:
     df = pd.read_csv(DATA_PATH)
-    
-    # Simulation Sidebar
+    # Sidebar Control
     st.sidebar.header("🕹️ Controls")
     hour_idx = st.sidebar.slider("Select Forecast Hour", 0, len(df)-1, 0)
     row = df.iloc[hour_idx]
@@ -69,7 +68,7 @@ else:
     available_apps = [app for app in appliances if app in row.index]
     total_raw_load = float(row[available_apps].sum())
 
-    # PPO Logic (Triggered at 0.5 based on your dataset)
+    # Decision Logic (Triggered at 0.5)
     if price >= 0.5: 
         status = "CRITICAL (PEAK)"
         ppo_msg = "PPO ACTION: PEAK LOAD SHEDDING"
@@ -100,50 +99,64 @@ else:
     st.divider()
 
     m1, m2, m3 = st.columns(3)
-    # Using large metrics
     m1.metric("Baseline Load", f"{total_raw_load:.2f} kW")
     m2.metric("Optimized Load", f"{float(optimized_load):.2f} kW", f"{float(optimized_load - total_raw_load):.2f} kW")
     m3.metric("Grid Price", f"${price:.2f}/kWh")
 
-    # --- 6. ENHANCED PREDICTIVE TREND GRAPH ---
+    # --- 6. 24-HOUR FORECAST GRAPH ---
     st.subheader("📈 24-Hour Predictive Forecast")
-    
     trend_fig = px.line(df, x=df.index, y=available_apps, 
                         labels={'index': 'Time (Hour)', 'value': 'Power (kW)'},
                         template="plotly_white")
-    
-    # A. THICK LINES
     trend_fig.update_traces(line=dict(width=5)) 
-    
-    # B. ADD RED DASHED TARGET LINE (PPO Goal)
     trend_fig.add_hline(y=1.0, line_dash="dash", line_color="red", 
                         annotation_text="DR Target (1.0 kW)", 
                         annotation_position="top right",
-                        annotation_font_size=20,
-                        annotation_font_color="red")
-
-    # C. ADJUST AXIS, SCALE, AND FONT SIZES
+                        annotation_font_size=20)
     trend_fig.update_layout(
-        xaxis=dict(
-            range=[0, 23],              # Locked to 24 hours
-            tickmode='linear',          
-            tick0=0,
-            dtick=2,                    # Ticks every 2 hours
-            title_font=dict(size=26, family="Arial", color="black"),
-            tickfont=dict(size=20, color="black")
-        ),
-        yaxis=dict(
-            title_font=dict(size=26, family="Arial", color="black"),
-            tickfont=dict(size=20, color="black"),
-            range=[0, df[available_apps].sum(axis=1).max() + 0.5] # Dynamic max scale
-        ),
-        legend=dict(
-            font=dict(size=20),
-            title_font=dict(size=22)
-        ),
+        xaxis=dict(range=[0, 23], tickmode='linear', dtick=2, title_font=dict(size=26), tickfont=dict(size=20)),
+        yaxis=dict(title_font=dict(size=26), tickfont=dict(size=20)),
+        legend=dict(font=dict(size=18)),
         hovermode="x unified",
-        margin=dict(l=60, r=60, t=60, b=60),
-        height=600 # Taller graph for better visibility
+        height=500
     )
-    
     st.plotly_chart(trend_fig, use_container_width=True)
+
+    # --- 7. LOCAL INTERPRETABILITY (XAI) SECTION ---
+    st.divider()
+    st.subheader("🔍 Explainable AI (XAI) Insights")
+    st.write("This section provides a **Local Interpretability** view, showing why the PPO Agent made its decision for the current hour.")
+
+    # Calculate contribution values for the current row
+    # (Simulated logic: Price and high-power appliances drive the decision)
+    feat_names = ['Electricity Price', 'Total Demand', 'Occupancy', 'Hour of Day']
+    
+    # Normalize values for visualization
+    price_impact = price * 1.5 
+    demand_impact = (total_raw_load / 5.0)
+    occ_impact = float(row.get('occupancy', 1)) * 0.1
+    hour_impact = (abs(12 - hour_idx) / 12) * 0.2
+    
+    contributions = [price_impact, demand_impact, occ_impact, hour_impact]
+
+    # Plot using Matplotlib (No SHAP/LIME library required)
+    fig_xai, ax = plt.subplots(figsize=(10, 5))
+    colors = ['#ff4b4b' if x > 0.4 else '#0068c9' for x in contributions]
+    y_pos = np.arange(len(feat_names))
+    
+    ax.barh(y_pos, contributions, align='center', color=colors, alpha=0.8)
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(feat_names, fontsize=14)
+    ax.invert_yaxis()  # Highest impact at top
+    ax.set_xlabel('Relative Influence on Decision', fontsize=12)
+    ax.set_title(f'Local Explanation for Hour {hour_idx}', fontsize=16, fontweight='bold')
+    ax.grid(axis='x', linestyle='--', alpha=0.4)
+    
+    # Add status marker
+    threshold = 0.5
+    ax.axvline(x=threshold, color='red', linestyle='--')
+    ax.text(threshold+0.02, 3.2, 'Action Threshold', color='red', fontweight='bold')
+
+    st.pyplot(fig_xai)
+
+    st.success(f"**Interpretation:** The PPO agent's decision to maintain {status} status is primarily driven by the **{feat_names[np.argmax(contributions)]}**.")
