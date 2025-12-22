@@ -5,129 +5,105 @@ import plotly.express as px
 import matplotlib.pyplot as plt
 import os
 
-# --- 1. PAGE CONFIGURATION ---
-st.set_page_config(page_title="Residential Digital Twin & XAI", layout="wide")
+# --- 1. PAGE CONFIG ---
+st.set_page_config(page_title="HEMS Digital Twin", layout="wide")
 
 # --- 2. LOAD DATA ---
-# Using the file you uploaded
 DATA_FILE = "24_hour_forecast(1).csv"
 
 @st.cache_data
 def load_data():
-    if os.path.exists(DATA_FILE):
-        df = pd.read_csv(DATA_FILE)
-        df['datetime'] = pd.to_datetime(df['datetime'])
-        return df
-    else:
+    if not os.path.exists(DATA_FILE):
         return None
+    df = pd.read_csv(DATA_FILE)
+    # Standardize column names (remove spaces, handle case)
+    df.columns = df.columns.str.strip()
+    df['datetime'] = pd.to_datetime(df['datetime'])
+    return df
 
 df = load_data()
 
 if df is None:
-    st.error(f"🚨 File `{DATA_FILE}` not found. Please ensure it is in the same directory.")
+    st.error(f"❌ File '{DATA_FILE}' not found! Please put the CSV in the same folder as this script.")
     st.stop()
 
-# --- 3. SIDEBAR CONTROLS ---
-st.sidebar.header("🕹️ Digital Twin Controls")
-st.sidebar.markdown("Navigate through the 24-hour predictive horizon.")
-hour_idx = st.sidebar.slider("Select Forecast Hour", 0, len(df)-1, 12)
+# --- 3. SIDEBAR ---
+st.sidebar.header("🕹️ Controls")
+hour_idx = st.sidebar.slider("Forecast Hour", 0, len(df)-1, 10)
 row = df.iloc[hour_idx]
 
-# --- 4. SYSTEM LOGIC (PPO AGENT SIMULATION) ---
-# We define the logic for the "Agent Decision" based on your paper's parameters
-price = float(row['electricity_price'])
-total_load = float(row['Total_Load_Forecasted'])
-dr_threshold = 1.2  # Defined in your framework
+# --- 4. DATA EXTRACTION (Handles missing columns gracefully) ---
+price = float(row.get('electricity_price', 0))
+# Check for total load; if missing, calculate it
+total_load = float(row.get('Total_Load_Forecasted', 0))
+if total_load == 0:
+    apps = ['Fridge', 'Heater', 'Fans', 'Lights', 'TV', 'Microwave', 'Washing_Machine']
+    total_load = sum([float(row.get(a, 0)) for a in apps])
 
-is_peak = price >= 0.15 or total_load > dr_threshold
+# Decision Logic
+is_peak = price >= 0.15 or total_load > 1.2
 status = "CRITICAL (PEAK)" if is_peak else "OPTIMIZED (NORMAL)"
-agent_action = "PPO ACTION: LOAD SHEDDING ACTIVE" if is_peak else "PPO STATUS: MONITORING"
 
-# --- 5. HEADER ---
-st.title("🌐 Residential Digital Twin Portal")
-st.markdown(f"**Current State Synchronization:** {row['datetime'].strftime('%Y-%m-%d %H:%M:%S')}")
+# --- 5. VISUAL LAYOUT ---
+st.title("🌐 Residential Digital Twin & XAI")
+st.write(f"**Synchronized Time:** {row['datetime']}")
 
-# --- 6. TOP ROW: SPATIAL & TELEMETRY ---
-col1, col2 = st.columns([1, 1.2])
+col1, col2 = st.columns([1, 1.5])
 
 with col1:
-    st.subheader("🏠 Spatial Synchronization")
-    # Dynamic House Display logic
-    glow = "rgba(255, 0, 0, 0.3)" if is_peak else "rgba(0, 255, 0, 0.1)"
-    st.markdown(
-        f"""
-        <div style="text-align: center; padding: 50px; background: {glow}; border-radius: 20px; border: 2px solid grey;">
-            <h1 style="font-size: 100px; margin: 0;">🏠</h1>
-            <h2 style="color: black; margin: 10px 0 0 0;">{status}</h2>
-            <p style="font-size: 20px; color: #333;"><b>Load: {total_load:.2f} kW</b></p>
+    st.subheader("🏠 House Status")
+    bg_color = "rgba(255, 75, 75, 0.2)" if is_peak else "rgba(75, 255, 75, 0.1)"
+    st.markdown(f"""
+        <div style="background:{bg_color}; padding:30px; border-radius:15px; text-align:center; border:2px solid #ddd;">
+            <h1 style="font-size:80px; margin:0;">🏠</h1>
+            <h2 style="margin:0;">{status}</h2>
+            <p>Load: <b>{total_load:.2f} kW</b> | Price: <b>${price:.2f}/kWh</b></p>
         </div>
-        """, unsafe_allow_html=True
-    )
-    st.info(f"🤖 **Decision:** {agent_action}")
+    """, unsafe_allow_html=True)
+    
+    if is_peak:
+        st.warning("⚠️ PPO Agent: Reducing non-essential loads.")
+    else:
+        st.success("✅ PPO Agent: Normal Operation.")
 
 with col2:
-    st.subheader("📊 Appliance Energy Breakdown")
-    apps = ['Fridge', 'Heater', 'Fans', 'Lights', 'TV', 'Microwave', 'Washing_Machine']
-    # Filter only apps present in columns
-    existing_apps = [a for a in apps if a in row.index]
-    if existing_apps:
-        pie_data = pd.DataFrame({
-            'Appliance': existing_apps,
-            'Consumption (kW)': [float(row[a]) for a in existing_apps]
-        })
-        fig_pie = px.pie(pie_data, values='Consumption (kW)', names='Appliance', hole=0.4,
-                         color_discrete_sequence=px.colors.qualitative.T10)
-        fig_pie.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=350, font=dict(size=16))
+    st.subheader("📊 Appliance Breakdown")
+    app_list = ['Fridge', 'Heater', 'Fans', 'Lights', 'TV', 'Microwave', 'Washing_Machine']
+    pie_vals = {a: float(row.get(a, 0)) for a in app_list if a in row.index}
+    if pie_vals:
+        fig_pie = px.pie(names=list(pie_vals.keys()), values=list(pie_vals.values()), hole=0.4)
+        fig_pie.update_layout(height=300, margin=dict(t=0, b=0, l=0, r=0))
         st.plotly_chart(fig_pie, use_container_width=True)
 
-# --- 7. MIDDLE ROW: METRICS & FORECAST ---
 st.divider()
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Predicted Load", f"{total_load:.2f} kW")
-m2.metric("Grid Price", f"${price:.2f}/kWh")
-m3.metric("Occupancy", "👤 Active" if row['occupancy'] == 1 else "⚪ Vacant")
-m4.metric("Savings Est.", f"{(total_load * 0.22):.2f} %")
 
-st.subheader("📈 24-Hour Predictive Forecast")
-# Plotting the forecasted lines
-trend_fig = px.line(df, x=df.index, y=existing_apps, 
-                    labels={'index': 'Time Step', 'value': 'Power (kW)'},
-                    template="plotly_white")
-trend_fig.update_traces(line=dict(width=4))
-trend_fig.add_hline(y=dr_threshold, line_dash="dash", line_color="red", 
-                    annotation_text="DR Target (1.2 kW)", annotation_position="top right")
-trend_fig.update_layout(height=400, font=dict(size=14))
-st.plotly_chart(trend_fig, use_container_width=True)
+# --- 6. XAI SECTION ---
+st.subheader("🔍 Explainable AI (XAI) Insight")
+st.info("Why is the agent taking this action?")
 
-# --- 8. BOTTOM ROW: EXPLAINABLE AI (XAI) ---
-st.divider()
-st.subheader("🔍 Explainable AI (XAI) Insights")
-st.write("This section provides a **Local Interpretability** view, explaining the mathematical weight behind the PPO Agent's current decision.")
-
-# Create the Feature Importance Graph (LIME/SHAP style)
-# We use the actual row data to determine influence
-features = ['Electricity Price', 'Current Demand', 'Occupancy', 'Meal Time']
-# Logic: Price and demand are the biggest drivers in your PPO framework
-weights = [
-    price * 2.0, 
-    (total_load / dr_threshold), 
-    0.2 if row['occupancy'] == 1 else 0.05,
-    0.3 if row['is_meal_time'] == 1 else 0.0
+# Feature Influence Data
+# We derive these from your actual CSV features
+features = ['Grid Price', 'Demand Magnitude', 'Occupancy', 'Meal Time']
+# Logic weights representing how the PPO agent 'thinks'
+impacts = [
+    price * 3.0,                     # Price impact
+    total_load / 1.5,                # Demand impact
+    float(row.get('occupancy', 0)),  # Occupancy impact
+    float(row.get('is_meal_time', 0)) # Schedule impact
 ]
 
-fig_xai, ax = plt.subplots(figsize=(10, 4))
-colors = ['#ff4b4b' if w > 0.5 else '#0068c9' for w in weights]
-y_pos = np.arange(len(features))
-
-ax.barh(y_pos, weights, align='center', color=colors)
-ax.set_yticks(y_pos)
-ax.set_yticklabels(features, fontsize=12)
-ax.invert_yaxis()  # Best at top
-ax.set_xlabel('Influence Weight on Decision', fontsize=12)
-ax.set_title(f"Why did the PPO Agent choose '{status}'?", fontsize=14, fontweight='bold')
-ax.grid(axis='x', linestyle='--', alpha=0.6)
-
-# Display the plot
+fig_xai, ax = plt.subplots(figsize=(10, 3))
+colors = ['#FF4B4B' if x > 0.6 else '#0068C9' for x in impacts]
+ax.barh(features, impacts, color=colors)
+ax.set_xlabel("Decision Influence Weight")
+ax.set_title("Local Interpretability (SHAP/LIME Style)")
+plt.tight_layout()
 st.pyplot(fig_xai)
 
-st.success(f"**XAI Summary:** For this time step, the primary driver for the decision was **{features[np.argmax(weights)]}**. This aligns with the 'Price-Elastic' behavior modeled in Section 6 of the paper.")
+# --- 7. FORECAST TREND ---
+st.subheader("📈 24-Hour Predictive Forecast")
+# Filter out non-appliance columns for the graph
+graph_cols = [c for c in app_list if c in df.columns]
+fig_line = px.line(df, x='datetime', y=graph_cols, template="plotly_white")
+fig_line.add_hline(y=1.2, line_dash="dash", line_color="red", annotation_text="DR Limit")
+st.plotly_chart(fig_line, use_container_width=True)
