@@ -5,105 +5,117 @@ import plotly.express as px
 import matplotlib.pyplot as plt
 import os
 
-# --- 1. PAGE CONFIG ---
-st.set_page_config(page_title="HEMS Digital Twin", layout="wide")
+# ==========================================
+# 1. PAGE SETUP & STYLING
+# ==========================================
+st.set_page_config(
+    page_title="Residential Digital Twin | XAI Portal",
+    page_icon="🌐",
+    layout="wide"
+)
 
-# --- 2. LOAD DATA ---
-DATA_FILE = "24_hour_forecast(1).csv"
+# Custom CSS for a professional look
+st.markdown("""
+    <style>
+    .main { background-color: #f8f9fa; }
+    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .status-box { padding: 25px; border-radius: 15px; text-align: center; border: 1px solid #dee2e6; margin-bottom: 20px; }
+    </style>
+    """, unsafe_allow_html=True)
 
+# ==========================================
+# 2. ROBUST DATA LOADING
+# ==========================================
 @st.cache_data
-def load_data():
-    if not os.path.exists(DATA_FILE):
-        return None
-    df = pd.read_csv(DATA_FILE)
-    # Standardize column names (remove spaces, handle case)
-    df.columns = df.columns.str.strip()
-    df['datetime'] = pd.to_datetime(df['datetime'])
-    return df
+def load_and_clean_data():
+    # List of possible filenames to avoid "File Not Found" errors
+    possible_files = ["24_hour_forecast(1).csv", "24_hour_forecast.csv", "next_day_prediction.csv"]
+    df = None
+    
+    for file in possible_files:
+        if os.path.exists(file):
+            df = pd.read_csv(file)
+            break
+            
+    if df is not None:
+        # Standardize Columns
+        df.columns = df.columns.str.strip()
+        if 'datetime' in df.columns:
+            df['datetime'] = pd.to_datetime(df['datetime'])
+        else:
+            # Create dummy datetime if missing
+            df['datetime'] = pd.date_range(start='2024-01-01', periods=len(df), freq='H')
+        return df
+    return None
 
-df = load_data()
+df = load_and_clean_data()
 
 if df is None:
-    st.error(f"❌ File '{DATA_FILE}' not found! Please put the CSV in the same folder as this script.")
+    st.error("🚨 **Error:** Data file not found. Please ensure '24_hour_forecast(1).csv' is in the same folder.")
     st.stop()
 
-# --- 3. SIDEBAR ---
-st.sidebar.header("🕹️ Controls")
-hour_idx = st.sidebar.slider("Forecast Hour", 0, len(df)-1, 10)
-row = df.iloc[hour_idx]
+# ==========================================
+# 3. SIDEBAR & NAVIGATION
+# ==========================================
+st.sidebar.header("🕹️ Digital Twin Controls")
+st.sidebar.markdown("Use the slider to inspect the 24-hour predictive horizon.")
 
-# --- 4. DATA EXTRACTION (Handles missing columns gracefully) ---
-price = float(row.get('electricity_price', 0))
-# Check for total load; if missing, calculate it
-total_load = float(row.get('Total_Load_Forecasted', 0))
+# Slider to pick the hour
+selected_hour = st.sidebar.slider("Select Forecast Hour", 0, len(df)-1, 12)
+row = df.iloc[selected_hour]
+
+# ==========================================
+# 4. AGENT LOGIC (PPO SIMULATION)
+# ==========================================
+# Extract core variables
+price = float(row.get('electricity_price', 0.10))
+total_load = float(row.get('Total_Load_Forecasted', row.get('Total_Load', 0)))
+
+# If Total_Load_Forecasted is 0, calculate it from appliances
 if total_load == 0:
     apps = ['Fridge', 'Heater', 'Fans', 'Lights', 'TV', 'Microwave', 'Washing_Machine']
     total_load = sum([float(row.get(a, 0)) for a in apps])
 
-# Decision Logic
-is_peak = price >= 0.15 or total_load > 1.2
-status = "CRITICAL (PEAK)" if is_peak else "OPTIMIZED (NORMAL)"
+# Optimization Logic (The Brain of your Paper)
+price_threshold = 0.15 # Typical peak price
+load_threshold = 1.5   # kW threshold
+is_peak = price >= price_threshold or total_load > load_threshold
 
-# --- 5. VISUAL LAYOUT ---
-st.title("🌐 Residential Digital Twin & XAI")
-st.write(f"**Synchronized Time:** {row['datetime']}")
+status_text = "CRITICAL (PEAK)" if is_peak else "OPTIMIZED (NORMAL)"
+status_color = "rgba(255, 75, 75, 0.2)" if is_peak else "rgba(75, 255, 75, 0.1)"
+agent_msg = "🚨 PPO ACTION: LOAD SHEDDING ACTIVE" if is_peak else "✅ PPO STATUS: MONITORING"
 
+# ==========================================
+# 5. DASHBOARD LAYOUT
+# ==========================================
+st.title("🌐 Residential Digital Twin & XAI Portal")
+st.write(f"**Temporal Sync:** {row['datetime'].strftime('%Y-%m-%d %H:%M:%S')}")
+
+# --- ROW 1: STATUS & TELEMETRY ---
 col1, col2 = st.columns([1, 1.5])
 
 with col1:
-    st.subheader("🏠 House Status")
-    bg_color = "rgba(255, 75, 75, 0.2)" if is_peak else "rgba(75, 255, 75, 0.1)"
+    st.subheader("🏠 Spatial State")
     st.markdown(f"""
-        <div style="background:{bg_color}; padding:30px; border-radius:15px; text-align:center; border:2px solid #ddd;">
-            <h1 style="font-size:80px; margin:0;">🏠</h1>
-            <h2 style="margin:0;">{status}</h2>
-            <p>Load: <b>{total_load:.2f} kW</b> | Price: <b>${price:.2f}/kWh</b></p>
+        <div class="status-box" style="background-color: {status_color};">
+            <h1 style="font-size: 80px; margin: 0;">🏠</h1>
+            <h2 style="margin: 5px;">{status_text}</h2>
+            <p style="font-size: 18px;">Live Load: <b>{total_load:.2f} kW</b></p>
         </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
     
     if is_peak:
-        st.warning("⚠️ PPO Agent: Reducing non-essential loads.")
+        st.warning(agent_msg)
     else:
-        st.success("✅ PPO Agent: Normal Operation.")
+        st.success(agent_msg)
 
 with col2:
-    st.subheader("📊 Appliance Breakdown")
+    st.subheader("📊 Appliance Consumption (kW)")
     app_list = ['Fridge', 'Heater', 'Fans', 'Lights', 'TV', 'Microwave', 'Washing_Machine']
-    pie_vals = {a: float(row.get(a, 0)) for a in app_list if a in row.index}
-    if pie_vals:
-        fig_pie = px.pie(names=list(pie_vals.keys()), values=list(pie_vals.values()), hole=0.4)
-        fig_pie.update_layout(height=300, margin=dict(t=0, b=0, l=0, r=0))
-        st.plotly_chart(fig_pie, use_container_width=True)
-
-st.divider()
-
-# --- 6. XAI SECTION ---
-st.subheader("🔍 Explainable AI (XAI) Insight")
-st.info("Why is the agent taking this action?")
-
-# Feature Influence Data
-# We derive these from your actual CSV features
-features = ['Grid Price', 'Demand Magnitude', 'Occupancy', 'Meal Time']
-# Logic weights representing how the PPO agent 'thinks'
-impacts = [
-    price * 3.0,                     # Price impact
-    total_load / 1.5,                # Demand impact
-    float(row.get('occupancy', 0)),  # Occupancy impact
-    float(row.get('is_meal_time', 0)) # Schedule impact
-]
-
-fig_xai, ax = plt.subplots(figsize=(10, 3))
-colors = ['#FF4B4B' if x > 0.6 else '#0068C9' for x in impacts]
-ax.barh(features, impacts, color=colors)
-ax.set_xlabel("Decision Influence Weight")
-ax.set_title("Local Interpretability (SHAP/LIME Style)")
-plt.tight_layout()
-st.pyplot(fig_xai)
-
-# --- 7. FORECAST TREND ---
-st.subheader("📈 24-Hour Predictive Forecast")
-# Filter out non-appliance columns for the graph
-graph_cols = [c for c in app_list if c in df.columns]
-fig_line = px.line(df, x='datetime', y=graph_cols, template="plotly_white")
-fig_line.add_hline(y=1.2, line_dash="dash", line_color="red", annotation_text="DR Limit")
-st.plotly_chart(fig_line, use_container_width=True)
+    # Filter for columns that actually exist
+    available_apps = [a for a in app_list if a in row.index]
+    
+    if available_apps:
+        pie_df = pd.DataFrame({
+            'Appliance': available_apps,
+            'Load': [float(row[a]) for a
