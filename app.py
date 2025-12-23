@@ -43,7 +43,7 @@ def load_data():
 df = load_data()
 
 if df is None:
-    st.error(f"❌ File '24_hour_forecast(1).csv' not found! Please place the CSV in the same folder as this script.")
+    st.error(f"❌ File 'next_day_prediction.csv' not found! Please place the CSV in the same folder as this script.")
     st.stop()
 
 # ==========================================
@@ -145,5 +145,6 @@ fig_line.update_layout(height=450, legend=dict(orientation="h", yanchor="bottom"
 st.plotly_chart(fig_line, use_container_width=True)
 
 st.caption("© 2025 Residential Digital Twin Framework | XGBoost-PPO-XAI Integration")
+
 
 
