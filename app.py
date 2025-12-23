@@ -28,7 +28,7 @@ st.markdown("""
 # ==========================================
 @st.cache_data
 def load_data():
-    DATA_FILE = "24_hour_forecast.csv"
+    DATA_FILE = "next_day_prediction.csv"
     if not os.path.exists(DATA_FILE):
         return None
     
@@ -145,4 +145,5 @@ fig_line.update_layout(height=450, legend=dict(orientation="h", yanchor="bottom"
 st.plotly_chart(fig_line, use_container_width=True)
 
 st.caption("© 2025 Residential Digital Twin Framework | XGBoost-PPO-XAI Integration")
+
 
